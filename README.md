@@ -20,6 +20,7 @@ modify lrepl.lua to specify which directory to watch and the location of the tra
 Usage 
 =====
 
-lsyncd ./lrepl.lua
-
-Then create files in the watch directory.
+* Configure Globus to use an ssh key
+* Authorize any end-points that you will use (source and destination) in GlobusOnline
+* Run lsyncd ./lrepl.lua
+* Then create files in the watch directory.
