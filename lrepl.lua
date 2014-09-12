@@ -22,10 +22,10 @@ repl = {
 	delay = 1,
 	onStartup = "/bin/echo telling about ^source",
 	onAttrib  = "/bin/echo attrib ^pathname",
-	onCreate  = "/global/scratch2/sd/canon/replication/transfer.pl ^source ^pathname",
-	onDelete  = "/bin/echo delete ^pathname",
-	onModify  = "/bin/echo modify ^pathname",
-	onMove    = "/bin/echo move ^o.pathname -> ^d.pathname",
+	onCreate  = "/global/scratch2/sd/canon/replication/transfer.pl create ^source ^pathname",
+	onDelete  = "/global/scratch2/sd/canon/replication/transfer.pl delete ^source ^pathname",
+	onModify  = "/bin/echo modify ignored ^pathname",
+	onMove    = "/bin/echo move ignored",
 }
 
 sync{repl, source="/global/scratch2/sd/canon/test", target="/tmp/trg/"}

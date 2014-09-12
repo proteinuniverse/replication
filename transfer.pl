@@ -1,10 +1,12 @@
 #!/usr/bin/env perl
 
 use MongoDB;
+use FindBin;
 use strict;
 
 my $config;
-open(C,"/global/scratch2/sd/canon/replication/config.ini") or die "Unable to open config file";
+use lib "$FindBin::Bin/../lib";
+open(C,$FindBin::Bin."/config.ini") or die "Unable to open config file";
 while(<C>){
   chomp;
   my ($p,$v)=split /=/;
@@ -14,10 +16,11 @@ close C;
 
 my $SRC=$config->{source};
 
-print "Replicating $SRC ".join(' ',@ARGV)."\n";
+#print "Replicating $SRC ".join(' ',@ARGV)."\n";
 
-my $dir=$ARGV[0];
-my $file=$ARGV[1];
+my $command=$ARGV[0];
+my $dir=$ARGV[1];
+my $file=$ARGV[2];
 my $user=$config->{mongo_user};
 my $pwd=$config->{mongo_pwd};
 my $dbn=$config->{mongo_db};
@@ -31,23 +34,47 @@ my $conn = MongoDB::MongoClient->new("host" => $config->{mongo_host} ,
 my $db = $conn->get_database('sdfdemo');
 my $repl=$db->get_collection('replication');
 
-my $label=$file;
+if ($command eq 'delete'){
+  print "Deleting $file\n";
+  $repl->remove({file => "$file"}) or die "Unable to delete Mongo record";
+  my @endpoints=split(',',$config->{endpoints});
+  for my $_ (@endpoints) {
+    my ($name,$site)=split /\|/;
+    print "removing $site$file\n";
+    if ( -d "$dir/$file" ){
+      system("ssh go rmdir $site$file");
+    } else {
+      system("ssh go rm $site$file");
+    }
+  }
+  exit;
+}
 
+
+my $label=$file;
 $label=~s/\//-/g;
 $label=~s/\..*//;
 
-print "file: $file\n";
 $repl->update({file => "$file"},{'$set' =>{ source => $SRC, create => time() }},{'upsert'=>1}) or die "Unable to insert Mongo record";
 
 my @endpoints=split(',',$config->{endpoints});
-for my $site (@endpoints) {
+for my $_ (@endpoints) {
+  my ($name,$site)=split /\|/;
+  print "copying to $name $site\n";
   if ( -d "$dir/$file" ){
     system("ssh go mkdir $site$file");
   }
   else{
-    system("ssh go scp -D --no-verify-checksum --label=\"lsyncd-replicate-$label\" --preserve-mtime $SRC:/$dir/$file $site$file");
-    my $s=$site;
-    $s=~s/:.*//;
-    $repl->update({file => $file}, {'$push' => {sites => {$s => 'started'}}}) if $? eq 0;
+    my $pid=fork();
+    if ($pid eq 0){
+      $repl->update({file => $file}, {'$set' => {"sites.$name" => 'starting'}});
+      system("ssh go \"scp -s 1 --no-verify-checksum --label=\'lsyncd-replicate-$label\' $SRC:/$dir/$file $site$file\"");
+      if ($? eq 0){
+        $repl->update({file => $file}, {'$set' => {"sites.$name" => 'finished'}}) if $? eq 0;
+      } else {
+        $repl->update({file => $file}, {'$set' => {"sites.$name" => 'failed'}}) if $? eq 0;
+      }
+      exit;
+    }
   }
 }

@@ -1,0 +1,115 @@
+<html><title>Data Replication</title>
+<head>
+<style type="text/css">
+* {
+    font-family: monospace;
+}
+.menuBox {
+    float: left;
+}
+.dataBox {
+    margin: 10px;
+    background-color:#b0e0e6;
+    vertical-align: middle;
+    text-align: center;
+}
+.dataBox p {
+    vertical-align: middle;
+    text-align: center;
+}
+.datum {
+    vertical-align: middle;
+    font-size: 2.7em;
+}
+</style>
+<link rel="stylesheet" type="text/css" href="jquery-ui-1.10.3/themes/smoothness/jquery-ui.min.css" />
+<link rel="stylesheet" type="text/css" href="DataTables-1.9.4/media/css/jquery.dataTables.css" />
+<script src="jquery-ui-1.10.3/jquery-1.9.1.js"></script>
+<script src="jquery-ui-1.10.3/ui/minified/jquery-ui.min.js"></script>
+<script src="DataTables-1.9.4/media/js/jquery.dataTables.js"></script>
+<script>
+
+function loading_div() {
+    return '<div style="width:100%"><br /><center><h3>Loading...</h3></center></br><center><img src="ajax-loader.gif" /></center></div>'
+}
+
+function getURLParameter(name) {
+    return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
+}
+
+$(document).ready(function() {
+    var url = 'http://portal.nersc.gov/project/bigdata/demo/status.php';
+    var data_array = new Array();
+     
+     
+    /*
+     * Initialse DataTables, with no sorting on the 'details' column
+     */
+
+    var data_table_obj = $('#datatable').dataTable( {
+        "aaSorting": [[ 1, "desc" ]],
+        "iDisplayLength" : 25,
+        "aLengthMenu": [[25, 50, 100, -1], [25, 50, 100, "All"]]
+    } );
+
+// Parse JSON and populate rows
+    $.getJSON(url, function(data) {
+            for (var proj in data) {
+                projdata = data[proj];
+		if (projdata['file'] == ''){continue}
+		// create a new javascript Date object based on the timestamp
+		// multiplied by 1000 so that the argument is in milliseconds, not seconds
+		var date = new Date(projdata['create']*1000);
+
+		// will display time in 10:30:23 format
+		var formattedTime = date.getMonth() + "/" + date.getDate() + "/" + date.getFullYear() + " " + date.getHours() + ":" + date.getMinutes();
+		var sites = {};
+	 	l=['bnl','pnnl','ornl'];
+		for (var i in l){
+		   s=l[i]; 
+ 		   sites[s]='unknown';
+                }
+                if (('sites' in projdata)){
+		   for (var i in l){
+		      s=l[i]; 
+                      if (s in projdata['sites']){
+ 			sites[s]=projdata['sites'][s];
+                      }
+ 		   }
+                }
+                lrow = [projdata['file'],
+			formattedTime,
+			sites['bnl'],
+			sites['ornl'],
+			sites['pnnl']
+			]
+                data_array.push(lrow);
+            };
+            data_table_obj.fnAddData(data_array);
+        });
+});
+
+</script>
+</head>
+
+
+<body>
+        <div id="menu">
+        </div>
+        <div class="container">
+            <table id="datatable">
+                <thead>
+                    <th>File</th>
+                    <th>Create</th>
+                    <th>BNL</th>
+                    <th>ORNL</th>
+                    <th>PNNL</th>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </body>
+
+
+</head>
+</html>
