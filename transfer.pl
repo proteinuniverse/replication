@@ -14,9 +14,10 @@ while(<C>){
 }
 close C;
 
-my $SRC=$config->{source};
+my $S=$config->{source};
+my ($srcname,$src)=split /\|/,$S;
 
-#print "Replicating $SRC ".join(' ',@ARGV)."\n";
+#print "Replicating $src ".join(' ',@ARGV)."\n";
 
 my $command=$ARGV[0];
 my $dir=$ARGV[1];
@@ -55,7 +56,8 @@ my $label=$file;
 $label=~s/\//-/g;
 $label=~s/\..*//;
 
-$repl->update({file => "$file"},{'$set' =>{ source => $SRC, create => time() }},{'upsert'=>1}) or die "Unable to insert Mongo record";
+$repl->update({file => "$file"},{'$set' =>{ source => $src, create => time() }},{'upsert'=>1}) or die "Unable to insert Mongo record";
+$repl->update({file => "$file"}, {'$set' => {"sites.$srcname" => 'source'}});
 
 my @endpoints=split(',',$config->{endpoints});
 for my $_ (@endpoints) {
@@ -68,7 +70,7 @@ for my $_ (@endpoints) {
     my $pid=fork();
     if ($pid eq 0){
       $repl->update({file => $file}, {'$set' => {"sites.$name" => 'starting'}});
-      system("ssh go \"scp -s 1 --no-verify-checksum --label=\'lsyncd-replicate-$label\' $SRC:/$dir/$file $site$file\"");
+      system("ssh go \"scp -s 1 --no-verify-checksum --label=\'lsyncd-replicate-$label\' $src:/$dir/$file $site$file\"");
       if ($? eq 0){
         $repl->update({file => $file}, {'$set' => {"sites.$name" => 'finished'}}) if $? eq 0;
       } else {

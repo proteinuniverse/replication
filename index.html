@@ -56,33 +56,34 @@ $(document).ready(function() {
     $.getJSON(url, function(data) {
             for (var proj in data) {
                 projdata = data[proj];
-		if (projdata['file'] == ''){continue}
-		// create a new javascript Date object based on the timestamp
-		// multiplied by 1000 so that the argument is in milliseconds, not seconds
-		var date = new Date(projdata['create']*1000);
+                if (projdata['file'] == ''){continue}
+                // create a new javascript Date object based on the timestamp
+                // multiplied by 1000 so that the argument is in milliseconds, not seconds
+                var date = new Date(projdata['create']*1000);
 
-		// will display time in 10:30:23 format
-		var formattedTime = date.getMonth() + "/" + date.getDate() + "/" + date.getFullYear() + " " + date.getHours() + ":" + date.getMinutes();
-		var sites = {};
-	 	l=['bnl','pnnl','ornl'];
-		for (var i in l){
-		   s=l[i]; 
- 		   sites[s]='unknown';
+                // will display time in 10:30:23 format
+                var formattedTime = date.getMonth() + "/" + date.getDate() + "/" + date.getFullYear() + " " + date.getHours() + ":" + date.getMinutes();
+                var sites = {};
+                l=['lbnl','bnl','pnnl','ornl'];
+                for (var i in l){
+                  s=l[i]; 
+                  sites[s]='unknown';
                 }
                 if (('sites' in projdata)){
-		   for (var i in l){
-		      s=l[i]; 
+                  for (var i in l){
+                      s=l[i]; 
                       if (s in projdata['sites']){
- 			sites[s]=projdata['sites'][s];
+                         sites[s]=projdata['sites'][s];
                       }
- 		   }
+                  }
                 }
                 lrow = [projdata['file'],
-			formattedTime,
-			sites['bnl'],
-			sites['ornl'],
-			sites['pnnl']
-			]
+                        formattedTime,
+                        sites['lbnl'],
+                        sites['bnl'],
+                        sites['ornl'],
+                        sites['pnnl']
+                        ]
                 data_array.push(lrow);
             };
             data_table_obj.fnAddData(data_array);
@@ -94,6 +95,7 @@ $(document).ready(function() {
 
 
 <body>
+<image src="sdf-small.png" align="right">
         <div id="menu">
         </div>
         <div class="container">
@@ -101,6 +103,7 @@ $(document).ready(function() {
                 <thead>
                     <th>File</th>
                     <th>Create</th>
+                    <th>LBNL</th>
                     <th>BNL</th>
                     <th>ORNL</th>
                     <th>PNNL</th>
@@ -109,7 +112,6 @@ $(document).ready(function() {
             </table>
         </div>
     </body>
-
 
 </head>
 </html>
