@@ -14,6 +14,14 @@ app = Flask(__name__)
 source = "shreyas#laptop"
 destinations = [ "nersc#pdsf", "nersc#dtn" ]
 transfer_api_url = "https://transfer.api.globusonline.org/v0.10"
+
+# TODO: Automate cred generation
+
+# Get the Token from globus oauth API as follows:
+#
+# curl --user your_globus_username 'https://nexus.api.globusonline.org/goauth/token?grant_type=client_credentials'
+#
+# (From the output JSON grab the 'access_token' field)
 token = ""
 
 transfer_template="""{
@@ -38,6 +46,10 @@ transfer_template="""{
 
 
 def replicate(source, dest, filepath):
+    """
+    Use the Globus Transfer API to do replication
+    https://transfer.api.globusonline.org/v0.10/doc/
+    """
     headers={"Authorization": "Globus-Goauthtoken %s" % token}
     r = requests.get(transfer_api_url+'/submission_id', headers=headers)
     # TODO: output validation 
@@ -61,7 +73,7 @@ def replicate(source, dest, filepath):
                                      recursive)
     # This will clean up the JSON
     payload=json.dumps(json.loads(post_body))
-    r = requests.post(transfer_api_url + '/transfer', data=, headers=headers)
+    r = requests.post(transfer_api_url + '/transfer', data=payload, headers=headers)
 
 @app.route("/")
 def base():
