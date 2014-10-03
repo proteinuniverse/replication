@@ -1,7 +1,6 @@
 
-from flask import Flask
-from flask import jsonify
-from flask import request
+from flask import Flask, jsonify, request
+import json
 import os
 import requests
 import urllib
@@ -11,7 +10,7 @@ app = Flask(__name__)
  
 
 # TODO: parse config
-source = "shreyas#laptop"
+source = "shreyas#lsp"
 destinations = [ "nersc#pdsf", "nersc#dtn" ]
 transfer_api_url = "https://transfer.api.globusonline.org/v0.10"
 
@@ -22,8 +21,7 @@ transfer_api_url = "https://transfer.api.globusonline.org/v0.10"
 # curl --user your_globus_username 'https://nexus.api.globusonline.org/goauth/token?grant_type=client_credentials'
 #
 # (From the output JSON grab the 'access_token' field)
-token = ""
-
+token = ''
 transfer_template="""{
   "submission_id": "%s", 
   "DATA_TYPE": "transfer", 
@@ -50,7 +48,8 @@ def replicate(source, dest, filepath):
     Use the Globus Transfer API to do replication
     https://transfer.api.globusonline.org/v0.10/doc/
     """
-    headers={"Authorization": "Globus-Goauthtoken %s" % token}
+    import pdb; pdb.set_trace()
+    headers={"Authorization": "Globus-Goauthtoken %s" % token, "Content-Type": "application/json"}
     r = requests.get(transfer_api_url+'/submission_id', headers=headers)
     # TODO: output validation 
     submission_id = r.json()['value']
@@ -60,9 +59,9 @@ def replicate(source, dest, filepath):
     source_path = filepath
     destination_path = os.path.basename(filepath)
     if os.path.isdir(filepath):
-        recursive = "false"
-    else
         recursive = "true"
+    else:
+        recursive = "false"
 
     post_body = transfer_template % (submission_id, 
                                      source_endpoint, 
@@ -74,6 +73,11 @@ def replicate(source, dest, filepath):
     # This will clean up the JSON
     payload=json.dumps(json.loads(post_body))
     r = requests.post(transfer_api_url + '/transfer', data=payload, headers=headers)
+
+    output = r.json()
+    if r.status_code!=200:
+        raise Exception(output['message'])
+    return output["task_id"]
 
 @app.route("/")
 def base():
@@ -90,6 +94,8 @@ def transfer():
     status = "OK"
     output = ""
     error = ""
+    transfer_ids=[]
+
 
     try:
         if filepath == '':
@@ -98,17 +104,16 @@ def transfer():
         dirname = os.path.dirname(filepath)
         filename = os.path.basename(filepath)
     
-        if os.path.exists(filepath):
-            output = "Replicating file"
-        else:
+        if not os.path.exists(filepath):
             raise Exception("File Not Found")
         # Fire off transfer(s)
 
-    transfer_ids = []
 
-    for dest in destinations:
-        t_id = replicate(source, dest, filepath)
-        transfer_ids.append(t_id) 
+        for dest in destinations:
+            t_id = replicate(source, dest, filepath)
+            transfer_ids.append(t_id) 
+
+        output = "Transfer submitted"
 
     except Exception, e:
         status = "ERROR"
@@ -124,8 +129,6 @@ def transfer():
                     "error": error})
 
 
-@app.route("/delete", methods=['GET'])
-def delete():
 
 
 
