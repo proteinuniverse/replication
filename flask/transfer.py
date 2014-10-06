@@ -22,7 +22,7 @@ transfer_api_url = "https://transfer.api.globusonline.org/v0.10"
 #
 # (From the output JSON grab the 'access_token' field)
 token = ''
-transfer_template="""{
+transfer_template = """{
   "submission_id": "%s", 
   "DATA_TYPE": "transfer", 
   "sync_level": null, 
@@ -48,9 +48,9 @@ def replicate(source, dest, filepath):
     Use the Globus Transfer API to do replication
     https://transfer.api.globusonline.org/v0.10/doc/
     """
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     headers={"Authorization": "Globus-Goauthtoken %s" % token, "Content-Type": "application/json"}
-    r = requests.get(transfer_api_url+'/submission_id', headers=headers)
+    r = requests.get(transfer_api_url + '/submission_id', headers=headers)
     # TODO: output validation 
     submission_id = r.json()['value']
     source_endpoint = source
@@ -75,7 +75,7 @@ def replicate(source, dest, filepath):
     r = requests.post(transfer_api_url + '/transfer', data=payload, headers=headers)
 
     output = r.json()
-    if r.status_code!=200:
+    if r.status_code < 200 or r.status_code > 299:
         raise Exception(output['message'])
     return output["task_id"]
 
@@ -110,12 +110,17 @@ def transfer():
 
 
         for dest in destinations:
-            t_id = replicate(source, dest, filepath)
-            transfer_ids.append(t_id) 
+            try:
+                t_id = replicate(source, dest, filepath)
+            except Exception as e:
+                # log message
+                print str(e)
+                t_id = None
+            transfer_ids.append((dest, t_id))
 
         output = "Transfer submitted"
 
-    except Exception, e:
+    except Exception as e:
         status = "ERROR"
         error = str(e)
 
