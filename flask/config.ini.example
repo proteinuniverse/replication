@@ -1,0 +1,11 @@
+[mongo]
+mongo_host=localhost
+mongo_user=sdfdemo
+mongo_pass=XXXXXX
+
+[globus]
+access_token=longaccesstokenstring
+source=shreyas#lsp
+destinations="pic#dtn:test/","scanon#bnl_sdf:/pnfs/usatlas.bnl.gov/sdf/"
+api_url=https://transfer.api.globusonline.org/v0.10
+

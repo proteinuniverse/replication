@@ -4,15 +4,23 @@ import json
 import os
 import requests
 import urllib
+import ConfigParser
 
 app = Flask(__name__)
 
  
 
-# TODO: parse config
-source = "shreyas#lsp"
+config = ConfigParser.ConfigParser()
+config.read('config.ini')
+
+token = config.get("globus", "access_token")
+source = config.get("globus", "source",)
+transfer_api_url = config.get("globus", "api_url")
+
+# TODO: parse dest from config
 destinations = [ "nersc#pdsf", "nersc#dtn" ]
-transfer_api_url = "https://transfer.api.globusonline.org/v0.10"
+
+
 
 # TODO: Automate cred generation
 
@@ -21,7 +29,6 @@ transfer_api_url = "https://transfer.api.globusonline.org/v0.10"
 # curl --user your_globus_username 'https://nexus.api.globusonline.org/goauth/token?grant_type=client_credentials'
 #
 # (From the output JSON grab the 'access_token' field)
-token = ''
 transfer_template = """{
   "submission_id": "%s", 
   "DATA_TYPE": "transfer", 
