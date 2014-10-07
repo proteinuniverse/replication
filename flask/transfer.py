@@ -18,8 +18,7 @@ source = config.get("globus", "source",)
 transfer_api_url = config.get("globus", "api_url")
 
 # TODO: parse dest from config
-destinations = [ "nersc#pdsf", "nersc#dtn" ]
-
+destinations = config.get("globus", "destinations").split(',')
 
 
 # TODO: Automate cred generation
