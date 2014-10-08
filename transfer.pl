@@ -56,7 +56,9 @@ my $label=$file;
 $label=~s/\//-/g;
 $label=~s/\..*//;
 
-$repl->update({file => "$file"},{'$set' =>{ source => $src, create => time() }},{'upsert'=>1}) or die "Unable to insert Mongo record";
+my @st=stat "$dir/$file";
+
+$repl->update({file => "$file"},{'$set' =>{ source => $src, ctime => $st[10], size=>$st[7] }},{'upsert'=>1}) or die "Unable to insert Mongo record";
 $repl->update({file => "$file"}, {'$set' => {"sites.$srcname" => 'source'}});
 
 my @endpoints=split(',',$config->{endpoints});
