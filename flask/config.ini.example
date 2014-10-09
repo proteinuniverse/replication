@@ -2,6 +2,7 @@
 mongo_host=localhost
 mongo_user=sdfdemo
 mongo_pass=XXXXXX
+mongo_db=sdfdemo
 
 [globus]
 access_token=longaccesstokenstring

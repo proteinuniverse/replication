@@ -1,10 +1,13 @@
 
-from flask import Flask, jsonify, request
+from flask import jsonify
+from flask import request
+from flask import Flask
 import json
 import os
 import requests
 import urllib
 import ConfigParser
+from pymongo import MongoClient
 
 app = Flask(__name__)
 
@@ -19,6 +22,15 @@ transfer_api_url = config.get("globus", "api_url")
 
 # TODO: parse dest from config
 destinations = config.get("globus", "destinations").split(',')
+mongo_host = config.get("mongo", "mongo_host")
+mongo_user = config.get("mongo", "mongo_user")
+mongo_pass = config.get("mongo", "mongo_pw")
+mongo_database = config.get("mongo", "mongo_database")
+
+# Don't use special chars in password using this syntax
+mongo_uri = "mongodb://%s:%s@%s/%s" % (mongo_user, mongo_pass, mongo_host, mongo_database)
+
+client = MongoClient(uri)
 
 
 # TODO: Automate cred generation
