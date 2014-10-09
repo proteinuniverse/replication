@@ -7,7 +7,7 @@ pip install -r requirements.txt
 
 ## Run
 ```
-python flask.py
+python transfer.py
 ```
 
 ## Test

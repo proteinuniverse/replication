@@ -24,10 +24,10 @@ transfer_api_url = config.get("globus", "api_url")
 destinations = config.get("globus", "destinations").split(',')
 mongo_host = config.get("mongo", "mongo_host")
 mongo_user = config.get("mongo", "mongo_user")
-mongo_pass = config.get("mongo", "mongo_pw")
+mongo_pass = config.get("mongo", "mongo_pass")
 mongo_database = config.get("mongo", "mongo_database")
 
-# Don't use special chars in password using this syntax
+# Don't use special chars in password with this syntax - URIs arent happy.
 mongo_uri = "mongodb://%s:%s@%s/%s" % (mongo_user, mongo_pass, mongo_host, mongo_database)
 
 client = MongoClient(uri)
