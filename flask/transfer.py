@@ -139,7 +139,10 @@ def transfer():
                 "ctime": st.st_ctime,
                 "size": st.st_size,
                 "sites": {
-                    source: "source"
+                    source: {
+                        "task_id": None,
+                        "status": "source",
+                    }
                 }
             }
         }
@@ -155,7 +158,10 @@ def transfer():
                 
                 doc = {
                     "$set": {
-                        dest_key: "started"
+                        dest_key:  {
+                            "task_id": t_id,
+                            "status": "running",
+                        }
                     }
                 }
                 collection.update(spec, doc, upsert=True)
@@ -165,7 +171,10 @@ def transfer():
                 t_id = None
                 doc = {
                     "$set": {
-                        dest_key: "failed"
+                        dest_key:  {
+                            "task_id": None,
+                            "status": "failed",
+                        }
                     }
                 }
                 collection.update(spec, doc, upsert=True)
