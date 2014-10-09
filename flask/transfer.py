@@ -115,6 +115,7 @@ def base():
 
 @app.route("/update", methods=['GET'])
 def update():
+    import pdb; pdb.set_trace()
     status = "OK"
     error = ""
     filepath = request.args.get('file', '')
