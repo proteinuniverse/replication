@@ -110,6 +110,49 @@ def base():
                     "output": "",
                     "error": ""})
 
+@app.route("/update", methods=['GET'])
+def update():
+    status = "OK"
+    error = ""
+    filepath = request.args.get('file', '')
+    output = []
+    import pdb; pdb.set_trace()
+    try:
+        if filepath == '':
+            raise Exception("No filename supplied")
+
+        spec = {"file": filepath}
+
+        doc = collection.find_one(spec)
+        if doc == None:
+            raise Exception("No doc found in mongo")
+
+        for site_name in doc['sites'].keys():
+            site = doc['sites'][site_name]
+            if site['status']=='running':
+                headers={"Authorization": "Globus-Goauthtoken %s" % token, "Content-Type": "application/json"}
+                r = requests.get(transfer_api_url + '/task/' + site['task_id'], headers=headers)
+                r_out = r.json()
+                output.append(r_out)
+                dest_key = "sites." + site_name + ".status"
+                update_doc = {
+                    "$set": {
+                        dest_key: r_out['status']
+                    }
+                }
+                collection.update(spec, update_doc, upsert=True)
+
+    except Exception as e:
+        status = "ERROR"
+        error = str(e)
+
+    return jsonify({"status": status, 
+                    "source": source + ":" + filepath,
+                    "output": output,
+                    "error": error})
+
+
+
 @app.route("/transfer", methods=['GET'])
 def transfer():
     filepath = request.args.get('file', '')
@@ -194,8 +237,6 @@ def transfer():
                     "transfer_ids": transfer_ids,
                     "output": output,
                     "error": error})
-
-
 
 
 
