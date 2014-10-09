@@ -19,19 +19,21 @@ config.read('config.ini')
 token = config.get("globus", "access_token")
 source = config.get("globus", "source",)
 transfer_api_url = config.get("globus", "api_url")
-
-# TODO: parse dest from config
 destinations = config.get("globus", "destinations").split(',')
-mongo_host = config.get("mongo", "mongo_host")
-mongo_user = config.get("mongo", "mongo_user")
-mongo_pass = config.get("mongo", "mongo_pass")
-mongo_database = config.get("mongo", "mongo_database")
 
-# Don't use special chars in password with this syntax - URIs arent happy.
-mongo_uri = "mongodb://%s:%s@%s/%s" % (mongo_user, mongo_pass, mongo_host, mongo_database)
+try:
+    mongo_host = config.get("mongo", "mongo_host")
+    mongo_user = config.get("mongo", "mongo_user")
+    mongo_pass = config.get("mongo", "mongo_pass")
+    mongo_database = config.get("mongo", "mongo_database")
 
-client = MongoClient(uri)
-
+    client = MongoClient(mongo_host)
+    db = client[mongo_database]
+    db.authenticate(mongo_user, mongo_pass)
+    collection = db['replication']
+except Exception as e:
+    print "Could not connect to Mongo DB: " + str(e)
+    exit -1
 
 # TODO: Automate cred generation
 
@@ -95,6 +97,8 @@ def replicate(source, dest, filepath):
     output = r.json()
     if r.status_code < 200 or r.status_code > 299:
         raise Exception(output['message'])
+
+
     return output["task_id"]
 
 @app.route("/")
@@ -124,16 +128,47 @@ def transfer():
     
         if not os.path.exists(filepath):
             raise Exception("File Not Found")
+
+
+        # Update Mongo entry:
+        st = os.stat(filepath)
+        spec = {"file": filepath}
+        doc = {
+            "$set": {
+                "source": source,
+                "ctime": st.st_ctime,
+                "size": st.st_size,
+                "sites": {
+                    source: "source"
+                }
+            }
+        }
+        collection.update(spec, doc, upsert=True)
         # Fire off transfer(s)
 
 
         for dest in destinations:
+            dest_key = "sites." + dest
             try:
+
                 t_id = replicate(source, dest, filepath)
+                
+                doc = {
+                    "$set": {
+                        dest_key: "started"
+                    }
+                }
+                collection.update(spec, doc, upsert=True)
             except Exception as e:
                 # log message
                 print str(e)
                 t_id = None
+                doc = {
+                    "$set": {
+                        dest_key: "failed"
+                    }
+                }
+                collection.update(spec, doc, upsert=True)
             transfer_ids.append((dest, t_id))
 
         output = "Transfer submitted"
