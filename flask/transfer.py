@@ -131,7 +131,8 @@ def update():
 
         for site_name in doc['sites'].keys():
             site = doc['sites'][site_name]
-            if site['status']=='running':
+            # TODO: Check other end states in Globus
+            if site['task_id'] and (site['status']!='SUCCEEDED'):
                 r = requests.get(transfer_api_url + '/task/' + site['task_id'], headers=headers)
                 r_out = r.json()
                 output.append(r_out)
@@ -204,7 +205,7 @@ def transfer():
                     "$set": {
                         dest_key:  {
                             "task_id": t_id,
-                            "status": "running",
+                            "status": "started",
                         }
                     }
                 }
