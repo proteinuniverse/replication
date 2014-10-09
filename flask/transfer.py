@@ -17,6 +17,10 @@ config = ConfigParser.ConfigParser()
 config.read('config.ini')
 
 token = config.get("globus", "access_token")
+
+headers = {"Authorization": "Globus-Goauthtoken %s" % token, "Content-Type": "application/json"}
+
+
 source = config.get("globus", "source",)
 transfer_api_url = config.get("globus", "api_url")
 destinations = config.get("globus", "destinations").split(',')
@@ -69,7 +73,6 @@ def replicate(source, dest, filepath):
     https://transfer.api.globusonline.org/v0.10/doc/
     """
     # import pdb; pdb.set_trace()
-    headers={"Authorization": "Globus-Goauthtoken %s" % token, "Content-Type": "application/json"}
     r = requests.get(transfer_api_url + '/submission_id', headers=headers)
     # TODO: output validation 
     submission_id = r.json()['value']
@@ -116,7 +119,6 @@ def update():
     error = ""
     filepath = request.args.get('file', '')
     output = []
-    import pdb; pdb.set_trace()
     try:
         if filepath == '':
             raise Exception("No filename supplied")
@@ -130,7 +132,6 @@ def update():
         for site_name in doc['sites'].keys():
             site = doc['sites'][site_name]
             if site['status']=='running':
-                headers={"Authorization": "Globus-Goauthtoken %s" % token, "Content-Type": "application/json"}
                 r = requests.get(transfer_api_url + '/task/' + site['task_id'], headers=headers)
                 r_out = r.json()
                 output.append(r_out)
