@@ -3,6 +3,7 @@ from flask import jsonify
 from flask import request
 from flask import Flask
 from flask import g
+from flask import render_template
 import json
 import os
 import requests
@@ -170,22 +171,28 @@ def parse_token(token):
 @app.before_request
 def before_request():
     # Do common stuff before each request. In this case we can check for headers
-    if request.headers.has_key('Authorization') and request.headers['Authorization'].startswith("Globus-Goauthtoken"):
-        g.headers = {"Authorization": "%s" % request.headers['Authorization'], "Content-Type": "application/json"}
-        # We can also verify the header if needed
-        g.token = request.headers['Authorization'].split()[1]
-        g.user_info = parse_token(g.token)
+    if request.path.startswith("/api"):
 
-    else:
-        response = jsonify({"status": "ERROR", 
-                        "output": "",
-                        "error": "Missing Authorization headers"})
-        response.status_code = 403
-        return response
+        if request.headers.has_key('Authorization') and request.headers['Authorization'].startswith("Globus-Goauthtoken"):
+            g.headers = {"Authorization": "%s" % request.headers['Authorization'], "Content-Type": "application/json"}
+            # We can also verify the header if needed
+            g.token = request.headers['Authorization'].split()[1]
+            g.user_info = parse_token(g.token)
 
+        else:
+            response = jsonify({"status": "ERROR", 
+                            "output": "",
+                            "error": "Missing Authorization headers"})
+            response.status_code = 403
+            return response
 
-@app.route("/")
-def base():
+@app.route('/')
+def status_page(name=None):
+    entries = json.loads(dumps(collection.find()))
+    return render_template('status.html', entries=entries)
+
+@app.route("/api")
+def base_api():
     output = json.loads(dumps(collection.find()))
     return jsonify({"status": "OK", 
                     "name": "replicant", 
@@ -194,7 +201,7 @@ def base():
                     "output": output,
                     "error": ""})
 
-@app.route("/mkdir", methods=['GET'])
+@app.route("/api/mkdir", methods=['GET'])
 def makedir():
     status = "OK"
     status_code = 200
@@ -219,7 +226,7 @@ def makedir():
     return response
 
 
-@app.route("/delete", methods=['GET'])
+@app.route("/api/delete", methods=['GET'])
 def delete():
     # import pdb; pdb.set_trace()
     user = g.user_info['un']
@@ -264,7 +271,7 @@ def delete():
 
 
 
-@app.route("/update", methods=['GET'])
+@app.route("/api/update", methods=['GET'])
 def update():
 
     user = g.user_info['un']
@@ -314,7 +321,7 @@ def update():
     return response
 
 
-@app.route("/transfer", methods=['GET'])
+@app.route("/api/transfer", methods=['GET'])
 def transfer():
 
     user = g.user_info['un']
