@@ -18,11 +18,6 @@ app = Flask(__name__)
 config = ConfigParser.ConfigParser()
 config.read('config.ini')
 
-token = config.get("globus", "access_token")
-
-default_headers = {"Authorization": "Globus-Goauthtoken %s" % token, "Content-Type": "application/json"}
-
-
 source = config.get("globus", "source",)
 transfer_api_url = config.get("globus", "api_url")
 destinations = config.get("globus", "destinations").split(',')
@@ -50,6 +45,25 @@ except Exception as e:
 # (From the output JSON grab the 'access_token' field)
 
 
+
+def remote_makedir(dest, filepath):
+    mkdir_template = """{
+      "path": "%s",
+      "DATA_TYPE": "mkdir"
+    }"""
+
+    post_body = mkdir_template % filepath
+    # This will clean up the JSON
+    payload=json.dumps(json.loads(post_body))
+
+    enc_dest = urllib.quote(dest)
+
+    r = requests.post(transfer_api_url + '/endpoint/%s/mkdir' % enc_dest, data=payload, headers=g.headers)
+    if r.status_code<200 or r.status_code>299:
+        message = r.json()['message']
+        raise Exception(message)
+    else:
+        return r.json()['message']
 
 
 
@@ -168,7 +182,7 @@ def before_request():
         g.headers = {"Authorization": "%s" % request.headers['Authorization'], "Content-Type": "application/json"}
         # We can also verify the header if needed
         g.token = request.headers['Authorization'].split()[1]
-        g.user_info = parse_token(token)
+        g.user_info = parse_token(g.token)
 
     else:
         response = jsonify({"status": "ERROR", 
@@ -176,7 +190,6 @@ def before_request():
                         "error": "Missing Authorization headers"})
         response.status_code = 403
         return response
-
 
 
 @app.route("/")
@@ -188,6 +201,31 @@ def base():
                     "urls": ["/transfer"],
                     "output": output,
                     "error": ""})
+
+@app.route("/mkdir", methods=['GET'])
+def makedir():
+    status = "OK"
+    status_code = 200
+    error = ""
+    filepath = request.args.get('file', '')
+    output = []
+
+    for dest in destinations:
+        try: 
+            message = remote_makedir(dest, filepath)
+            output.append({dest: {"status": "OK", "message": message}})
+        except Exception as e:
+            message = str(e)
+            output.append({dest: {"status": "ERROR", "message": message}})
+
+
+    
+    response = jsonify({"status": "OK", 
+                    "output": output,
+                    "error": ""})
+    response.status_code = status_code
+    return response
+
 
 @app.route("/delete", methods=['GET'])
 def delete():
