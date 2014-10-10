@@ -5,7 +5,6 @@ mongo_pass=XXXXXX
 mongo_database=sdfdemo
 
 [globus]
-access_token=longaccesstokenstring
 source=shreyas#lsp
 destinations="pic#dtn:test/","scanon#bnl_sdf:/pnfs/usatlas.bnl.gov/sdf/"
 api_url=https://transfer.api.globusonline.org/v0.10
