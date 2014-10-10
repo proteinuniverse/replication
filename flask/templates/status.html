@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Replicant</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Bootstrap -->
+    <link href="{{ url_for('static', filename='css/bootstrap.css') }}" rel="stylesheet" media="screen">
+    <style type="text/css">
+
+      /* Sticky footer styles
+      -------------------------------------------------- */
+
+      html,
+      body {
+        height: 100%;
+        /* The html and body elements cannot have any padding or margin. */
+      }
+
+      /* Wrapper for page content to push down footer */
+      #wrap {
+        min-height: 100%;
+        height: auto !important;
+        height: 100%;
+        /* Negative indent footer by it's height */
+        margin: 0 auto -60px;
+      }
+
+      /* Set the fixed height of the footer here */
+      #push,
+      #footer {
+        height: 60px;
+      }
+      #footer {
+        background-color: #f5f5f5;
+      }
+
+      /* Lastly, apply responsive CSS fixes as necessary */
+      @media (max-width: 767px) {
+        #footer {
+          margin-left: -20px;
+          margin-right: -20px;
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+      }
+
+
+
+      /* Custom page CSS
+      -------------------------------------------------- */
+      /* Not required for template or sticky footer method. */
+
+      .container {
+        width: auto;
+        max-width: 680px;
+      }
+      .container .credit {
+        margin: 20px 0;
+      }
+	</style>
+
+</head>
+<body>
+   <div id="wrap">
+
+      <!-- Begin page content -->
+      <div class="container">
+        <div class="page-header">
+          <h1>Replicant</h1>
+        </div>
+        <p class="lead">File Replication Demo for SDF</p>
+      	<table class="table table-hover">
+      		<thead>
+      			<th>File/Directory</th>
+      			<th>User</th>
+      			<th>Source</th>
+      			<th>Status</th>
+      		</thead>
+      		<tbody>
+      		{% for entry in entries %}
+      		<tr>
+      			<td>{{ entry.file }}</td>
+      			<td>{{ entry.user }}</td>
+      			<td>{{ entry.source }}</td>
+      			<td>nersc#hpss: {{ entry.sites['nersc#hpss']['status'] }} <br />
+
+      				nersc#dtn: {{ entry.sites['nersc#dtn']['status'] }} <br />
+      				nersc#pdsf: {{ entry.sites['nersc#pdsf']['status'] }}
+      			</td>	
+      		</tr>
+      		{% endfor %}
+ 	     	</tbody>
+      	</table>
+      </div>
+
+      <div id="push">
+
+      </div>
+    </div>
+
+    <div id="footer">
+      <div class="container">
+        <p class="muted credit">Shane Canon, Shreyas Cholia</p>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/jquery.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/bootstrap.js') }}"></script>
+</body>
+</html>
