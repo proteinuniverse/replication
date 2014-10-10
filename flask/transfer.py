@@ -36,14 +36,6 @@ except Exception as e:
     print "Could not connect to Mongo DB: " + str(e)
     exit -1
 
-# TODO: Automate cred generation
-
-# Get the Token from globus oauth API as follows:
-#
-# curl --user your_globus_username 'https://nexus.api.globusonline.org/goauth/token?grant_type=client_credentials'
-#
-# (From the output JSON grab the 'access_token' field)
-
 
 
 def remote_makedir(dest, filepath):
@@ -198,7 +190,7 @@ def base():
     return jsonify({"status": "OK", 
                     "name": "replicant", 
                     "version": "0.0.1", 
-                    "urls": ["/transfer"],
+                    "urls": ["/transfer", "/update", "/delete", "/mkdir"],
                     "output": output,
                     "error": ""})
 
