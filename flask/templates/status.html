@@ -82,10 +82,13 @@
       			<td>{{ entry.file }}</td>
       			<td>{{ entry.user }}</td>
       			<td>{{ entry.source }}</td>
-      			<td>nersc#hpss: {{ entry.sites['nersc#hpss']['status'] }} <br />
-
-      				nersc#dtn: {{ entry.sites['nersc#dtn']['status'] }} <br />
-      				nersc#pdsf: {{ entry.sites['nersc#pdsf']['status'] }}
+      			<td> {% for site in entry.sites %}
+                                {% if entry.sites[site]['status'] %}
+      				{{site}}: {{ entry.sites[site]['status'] }} <br />
+                                {% else %}
+      				{{site}}: {{ entry.sites[site] }} <br />
+                                {% endif %}
+      		            {% endfor %}
       			</td>	
       		</tr>
       		{% endfor %}

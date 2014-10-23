@@ -14,14 +14,27 @@ from bson.json_util import dumps
 
 app = Flask(__name__)
 
- 
+test_mode=1 
 
 config = ConfigParser.ConfigParser()
 config.read('config.ini')
 
-source = config.get("globus", "source",)
+trans={}
+src = config.get("globus", "source",)
+source = src.split('|')[1]
 transfer_api_url = config.get("globus", "api_url")
-destinations = config.get("globus", "destinations").split(',')
+
+(alias,endpt)=src.split('|')
+trans[alias]=endpt
+trans[endpt]=alias
+dsts = config.get("globus", "destinations").split(',')
+destinations=[]
+for dest in dsts:
+  (alias,endpt)=dest.split('|')
+  trans[alias]=endpt
+  trans[endpt]=alias
+  destinations.append(dest.split('|')[1])
+  #destinations = config.get("globus", "destinations").split(',')
 
 try:
     mongo_host = config.get("mongo", "mongo_host")
@@ -31,7 +44,8 @@ try:
 
     client = MongoClient(mongo_host)
     db = client[mongo_database]
-    db.authenticate(mongo_user, mongo_pass)
+    if mongo_user != '':
+      db.authenticate(mongo_user, mongo_pass)
     collection = db['replication']
 except Exception as e:
     print "Could not connect to Mongo DB: " + str(e)
@@ -45,6 +59,8 @@ def remote_makedir(dest, filepath):
       "DATA_TYPE": "mkdir"
     }"""
 
+    if test_mode==1:
+      return 1
     post_body = mkdir_template % filepath
     # This will clean up the JSON
     payload=json.dumps(json.loads(post_body))
@@ -66,6 +82,8 @@ def replicate(source, dest, filepath):
     https://transfer.api.globusonline.org/v0.10/doc/
     """
 
+    if test_mode==1:
+      return 1
     transfer_template = """{
       "submission_id": "%s", 
       "DATA_TYPE": "transfer", 
@@ -133,6 +151,8 @@ def remote_del(dest, filepath):
         ]
     }"""
 
+    if test_mode==1:
+      return 1
     r = requests.get(transfer_api_url + '/submission_id', headers=g.headers)
     endpoint = dest
     submission_id = r.json()['value']
@@ -189,7 +209,16 @@ def before_request():
 @app.route('/')
 def status_page(name=None):
     entries = json.loads(dumps(collection.find()))
-    return render_template('status.html', entries=entries)
+    response={}
+    try:
+       response=render_template('status.html', entries=entries)
+       return response
+    except Exception as e:
+       return 'ERROR '+str(e)
+    
+@app.route('/api/status')
+def status_json(name=None):
+    return dumps(collection.find())
 
 @app.route("/api")
 def base_api():
@@ -197,7 +226,7 @@ def base_api():
     return jsonify({"status": "OK", 
                     "name": "replicant", 
                     "version": "0.0.1", 
-                    "urls": ["/transfer", "/update", "/delete", "/mkdir"],
+                    "urls": ["/transfer", "/update", "/delete", "/mkdir","/status"],
                     "output": output,
                     "error": ""})
 
@@ -242,7 +271,7 @@ def delete():
         if filepath == '':
             raise Exception("No filename supplied")
         for dest in destinations:
-            dest_key = "sites." + dest
+            dest_key = "sites." + trans[dest]
             t_id = remote_del(dest, filepath)
             transfer_ids.append((dest, t_id))
             doc = {
@@ -269,6 +298,16 @@ def delete():
     response.status_code = status_code
     return response
 
+def get_status(task_id):
+    print "Updating for %d"%(task_id)
+    if test_mode==1:
+      return 'SUCCEEDED'
+    r = requests.get(transfer_api_url + '/task/' + task_id, headers=g.headers)
+    r_out = r.json()
+    output.append(r_out)
+    if r_out['status']=='SUCCEEDED' and r_out['type']=='DELETE':
+      return 'DELETED'
+    return r_out['status']
 
 
 @app.route("/api/update", methods=['GET'])
@@ -295,15 +334,11 @@ def update():
             site = doc['sites'][site_name]
             # TODO: Check other end states in Globus
             if site['task_id'] and (site['status']!='SUCCEEDED') and (site['status']!='deleted'):
-                r = requests.get(transfer_api_url + '/task/' + site['task_id'], headers=g.headers)
-                r_out = r.json()
-                output.append(r_out)
-                if r_out['status']=='SUCCEEDED' and r_out['type']=='DELETE':
-                    r_out['status']='deleted'
+                status=get_status(site['task_id'])
                 dest_key = "sites." + site_name + ".status"
                 update_doc = {
                     "$set": {
-                        dest_key: r_out['status']
+                        dest_key: status
                     }
                 }
                 collection.update(spec, update_doc, upsert=True)
@@ -327,6 +362,8 @@ def transfer():
     user = g.user_info['un']
 
     filepath = request.args.get('file', '')
+    ctime = request.args.get('ctime', '')
+    size = request.args.get('size', '')
     status = "OK"
     status_code = 200
     output = ""
@@ -338,27 +375,27 @@ def transfer():
         if filepath == '':
             raise Exception("No filename supplied")
 
-        dirname = os.path.dirname(filepath)
-        filename = os.path.basename(filepath)
+        #dirname = os.path.dirname(filepath)
+        #filename = os.path.basename(filepath)
     
         # TODO - make this work for remote sources
-        if not os.path.exists(filepath):
-            raise Exception("File Not Found")
+        #if not os.path.exists(filepath):
+        #    raise Exception("File Not Found")
 
 
         # Update Mongo entry:
         # TODO - make this work for remote sources
 
-        st = os.stat(filepath)
+        #st = os.stat(filepath)
         spec = {"file": filepath, "user": user}
         doc = {
             "$set": {
                 "user": user,
-                "source": source,
-                "ctime": st.st_ctime,
-                "size": st.st_size,
+                "source": trans[source],
+                "ctime": ctime,
+                "size": size,
                 "sites": {
-                    source: {
+                    trans[source]: {
                         "task_id": None,
                         "status": "source",
                     }
@@ -370,7 +407,7 @@ def transfer():
 
 
         for dest in destinations:
-            dest_key = "sites." + dest
+            dest_key = "sites." + trans[dest]
             try:
 
                 t_id = replicate(source, dest, filepath)
@@ -408,7 +445,7 @@ def transfer():
 
 
     response = jsonify({"status": status, 
-                    "source": source + ":" + filepath,
+                    "source": trans[source] + ":" + filepath,
                     "destinations": destinations, 
                     "transfer_ids": transfer_ids,
                     "output": output,
