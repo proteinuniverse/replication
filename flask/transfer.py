@@ -14,12 +14,13 @@ from bson.json_util import dumps
 
 app = Flask(__name__)
 
-test_mode=1 
+test_mode=0 
 
 config = ConfigParser.ConfigParser()
 config.read('config.ini')
 
 trans={}
+basepath={}
 src = config.get("globus", "source",)
 source = src.split('|')[1]
 transfer_api_url = config.get("globus", "api_url")
@@ -30,10 +31,12 @@ trans[endpt]=alias
 dsts = config.get("globus", "destinations").split(',')
 destinations=[]
 for dest in dsts:
-  (alias,endpt)=dest.split('|')
+  (alias,tmp)=dest.split('|')
+  (endpt,base)=tmp.split(':')
   trans[alias]=endpt
   trans[endpt]=alias
-  destinations.append(dest.split('|')[1])
+  basepath[endpt]=base
+  destinations.append(endpt)
   #destinations = config.get("globus", "destinations").split(',')
 
 try:
@@ -170,6 +173,7 @@ def remote_del(dest, filepath):
                                    path)
     # This will clean up the JSON
     payload=json.dumps(json.loads(post_body))
+    print "Debug: %s"%(endpoint)
     r = requests.post(transfer_api_url + '/delete', data=payload, headers=g.headers)
 
     output = r.json()
@@ -272,7 +276,7 @@ def delete():
             raise Exception("No filename supplied")
         for dest in destinations:
             dest_key = "sites." + trans[dest]
-            t_id = remote_del(dest, filepath)
+            t_id = remote_del(dest, basepath[dest]+'/'+filepath)
             transfer_ids.append((dest, t_id))
             doc = {
                 "$set": {
@@ -299,12 +303,12 @@ def delete():
     return response
 
 def get_status(task_id):
-    print "Updating for %d"%(task_id)
+    print "Updating for %s"%(task_id)
     if test_mode==1:
       return 'SUCCEEDED'
     r = requests.get(transfer_api_url + '/task/' + task_id, headers=g.headers)
     r_out = r.json()
-    output.append(r_out)
+    #output.append(r_out)
     if r_out['status']=='SUCCEEDED' and r_out['type']=='DELETE':
       return 'DELETED'
     return r_out['status']
