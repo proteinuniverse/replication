@@ -80,7 +80,10 @@
       		{% for entry in entries %}
       		<tr>
       			<td>{{ entry.file }}</td>
-      			<td>{{ entry.user }}</td>
+      			<td>{{ entry.user }}:{% if entry.replgroup %}
+      			    {{ entry.replgroup }} <br />
+                            {% endif %}
+                        </td>
       			<td>{{ entry.source }}</td>
       			<td> {% for site in entry.sites %}
                                 {% if entry.sites[site]['status'] %}

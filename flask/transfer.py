@@ -9,35 +9,33 @@ import os
 import requests
 import urllib
 import ConfigParser
+import uuid
 from pymongo import MongoClient
 from bson.json_util import dumps
 
 app = Flask(__name__)
 
-test_mode=0 
+test_mode=1
 
 config = ConfigParser.ConfigParser()
 config.read('config.ini')
 
-trans={}
-basepath={}
-src = config.get("globus", "source",)
-source = src.split('|')[1]
+groups={}
+defgroup='default'
+defsource='lbnl'
+
+def register_group(group,list):
+    groups[group]={}
+    for entry in list.split(','):
+        (dest,tmp)=entry.split('|')
+        (ept,base)=tmp.split(':')
+        groups[group][dest]={}
+        groups[group][dest]['endpt']=ept
+        groups[group][dest]['base']=base
+
 transfer_api_url = config.get("globus", "api_url")
 
-(alias,endpt)=src.split('|')
-trans[alias]=endpt
-trans[endpt]=alias
-dsts = config.get("globus", "destinations").split(',')
-destinations=[]
-for dest in dsts:
-  (alias,tmp)=dest.split('|')
-  (endpt,base)=tmp.split(':')
-  trans[alias]=endpt
-  trans[endpt]=alias
-  basepath[endpt]=base
-  destinations.append(endpt)
-  #destinations = config.get("globus", "destinations").split(',')
+register_group(defgroup,config.get("globus", "destinations"))
 
 try:
     mongo_host = config.get("mongo", "mongo_host")
@@ -56,19 +54,21 @@ except Exception as e:
 
 
 
+#def remote_makedir(group,dest, filepath):
 def remote_makedir(dest, filepath):
     mkdir_template = """{
-      "path": "%s",
+      "path": "%s/%s",
       "DATA_TYPE": "mkdir"
     }"""
 
     if test_mode==1:
-      return 1
-    post_body = mkdir_template % filepath
+      print "Debug: "+dest
+      return str(uuid.uuid4())
+    post_body = mkdir_template % (dest['base'],filepath)
     # This will clean up the JSON
     payload=json.dumps(json.loads(post_body))
 
-    enc_dest = urllib.quote(dest)
+    enc_dest = urllib.quote(endpoints[dest]['endpt'])
 
     r = requests.post(transfer_api_url + '/endpoint/%s/mkdir' % enc_dest, data=payload, headers=g.headers)
     if r.status_code<200 or r.status_code>299:
@@ -79,14 +79,16 @@ def remote_makedir(dest, filepath):
 
 
 
-def replicate(source, dest, filepath):
+def replicate(source, dest, file):
     """
     Use the Globus Transfer API to do replication
     https://transfer.api.globusonline.org/v0.10/doc/
     """
 
     if test_mode==1:
-      return 1
+      print "Debug: "+str(source)
+      print "Debug: "+str(dest)
+      return str(uuid.uuid4())
     transfer_template = """{
       "submission_id": "%s", 
       "DATA_TYPE": "transfer", 
@@ -109,15 +111,14 @@ def replicate(source, dest, filepath):
     r = requests.get(transfer_api_url + '/submission_id', headers=g.headers)
     # TODO: output validation 
     submission_id = r.json()['value']
-    source_endpoint = source
+    source_endpoint = source['endpt']
     label = "SDF replication testing"
-    destination_endpoint = dest
-    source_path = filepath
-    destination_path = os.path.basename(filepath)
-    if os.path.isdir(filepath):
-        recursive = "true"
-    else:
-        recursive = "false"
+    destination_endpoint = dest['endpt']
+    source_path = "%s/%s"%(source['base'],file)
+    destination_path = "%s/%s"%(dest['base'],file)
+    recursive = "false"
+    #if os.path.isdir(filepath):
+    #    recursive = "true"
 
     post_body = transfer_template % (submission_id, 
                                      source_endpoint, 
@@ -155,16 +156,15 @@ def remote_del(dest, filepath):
     }"""
 
     if test_mode==1:
-      return 1
+      return str(uuid.uuid4())
     r = requests.get(transfer_api_url + '/submission_id', headers=g.headers)
-    endpoint = dest
+    endpoint = dest['endpt']
     submission_id = r.json()['value']
     label = "SDF delete testing"
-    path = os.path.basename(filepath)
-    if os.path.isdir(filepath):
-        recursive = "true"
-    else:
-        recursive = "false"
+    recursive="false"
+    path = dest['base']+filepath
+    #if os.path.isdir(filepath):
+    #    recursive = "true"
 
     post_body = delete_template % (submission_id, 
                                    endpoint,
@@ -234,17 +234,60 @@ def base_api():
                     "output": output,
                     "error": ""})
 
+@app.route("/api/register", methods=['GET','POST'])
+def register():
+    status = "OK"
+    status_code = 200
+    error = ""
+    group = request.args.get('group', '')
+    output = []
+    destinations = ""
+    user = str(g.user_info['un'])
+
+    if request.method=='GET':
+         return jsonify(groups)
+       
+
+    try: 
+        if group == '':
+            raise Exception("No group supplied")
+        group="%s:%s"%(user,str(group))
+        if 'destinations' not in request.form:
+            raise Exception("No destinations list supplied")
+        destinations = str(request.form['destinations'])
+        register_group(group,destinations)
+        print groups
+    except Exception as e:
+        message = str(e)
+        output.append({"status": "ERROR", "message": message})
+
+
+    
+    response = jsonify({"status": "OK", 
+                    "group": group,
+                    "destinations": destinations,
+                    "output": output,
+                    "error": ""})
+    response.status_code = status_code
+    return response
+
 @app.route("/api/mkdir", methods=['GET'])
 def makedir():
     status = "OK"
     status_code = 200
     error = ""
     filepath = request.args.get('file', '')
+    source = request.args.get('source', '')
+    group = request.args.get('group', defgroup)
     output = []
+    destinations=groups[group].keys()
 
     for dest in destinations:
+        if dest == source:
+          continue
         try: 
-            message = remote_makedir(dest, filepath)
+            dst = groups[group][dest]
+            message = remote_makedir(dst,filepath)
             output.append({dest: {"status": "OK", "message": message}})
         except Exception as e:
             message = str(e)
@@ -268,15 +311,30 @@ def delete():
     error = ""
     filepath = request.args.get('file', '')
     output = ""
+    source = ""
     transfer_ids=[]
     spec = {"file": filepath, "user": user}
 
     try:
         if filepath == '':
             raise Exception("No filename supplied")
+        spec = {"file": filepath, "user": user}
+
+        entry = collection.find_one(spec)
+        if entry==None:
+           raise Exception("Invalid filename supplied")
+        source = entry['source']
+        if 'replgroup' in entry:
+            group=entry['replgroup']
+        else:
+             group=defgroup
+        destinations=groups[group].keys()
         for dest in destinations:
-            dest_key = "sites." + trans[dest]
-            t_id = remote_del(dest, basepath[dest]+'/'+filepath)
+            if source == dest:
+                continue
+            dest_key = "sites." + dest
+            dst = groups[group][dest]
+            t_id = remote_del(dst, filepath)
             transfer_ids.append((dest, t_id))
             doc = {
                 "$set": {
@@ -295,7 +353,7 @@ def delete():
 
 
     response = jsonify({"status": status, 
-                    "source": source + ":" + filepath, 
+                    "source": source + ":" + filepath,
                     "transfer_ids": transfer_ids,
                     "output": output,
                     "error": error})
@@ -353,7 +411,7 @@ def update():
         status_code = 500
 
     response = jsonify({"status": status, 
-                    "source": source + ":" + filepath,
+                    "file": filepath,
                     "output": output,
                     "error": error})
     response.status_code = status_code
@@ -368,38 +426,41 @@ def transfer():
     filepath = request.args.get('file', '')
     ctime = request.args.get('ctime', '')
     size = request.args.get('size', '')
+    source = request.args.get('source', defsource)
+    group = request.args.get('group', defgroup)
     status = "OK"
     status_code = 200
     output = ""
     error = ""
+    destinations = ""
     transfer_ids=[]
 
-
     try:
+        if group not in groups:
+            raise Exception("Group not recognized")
+        destinations=groups[group].keys()
+
         if filepath == '':
             raise Exception("No filename supplied")
 
-        #dirname = os.path.dirname(filepath)
-        #filename = os.path.basename(filepath)
-    
-        # TODO - make this work for remote sources
-        #if not os.path.exists(filepath):
-        #    raise Exception("File Not Found")
+        if source == '':
+            raise Exception("No source supplied")
+
+        if source not in destinations:
+            raise Exception("Source not recognized")
 
 
         # Update Mongo entry:
-        # TODO - make this work for remote sources
-
-        #st = os.stat(filepath)
         spec = {"file": filepath, "user": user}
         doc = {
             "$set": {
                 "user": user,
-                "source": trans[source],
+                "source": source,
                 "ctime": ctime,
                 "size": size,
+                "replgroup": group,
                 "sites": {
-                    trans[source]: {
+                    source: {
                         "task_id": None,
                         "status": "source",
                     }
@@ -409,12 +470,14 @@ def transfer():
         collection.update(spec, doc, upsert=True)
         # Fire off transfer(s)
 
-
         for dest in destinations:
-            dest_key = "sites." + trans[dest]
+            if source == dest:
+              continue
+            dest_key = "sites." + dest
             try:
-
-                t_id = replicate(source, dest, filepath)
+                src=groups[group][source] 
+                dst=groups[group][dest] 
+                t_id = replicate(src, dst, filepath)
                 
                 doc = {
                     "$set": {
@@ -427,7 +490,7 @@ def transfer():
                 collection.update(spec, doc, upsert=True)
             except Exception as e:
                 # log message
-                print str(e)
+                print "Debug transfer: "+str(e)
                 t_id = None
                 doc = {
                     "$set": {
@@ -449,7 +512,7 @@ def transfer():
 
 
     response = jsonify({"status": status, 
-                    "source": trans[source] + ":" + filepath,
+                    "source": source + ":" + filepath,
                     "destinations": destinations, 
                     "transfer_ids": transfer_ids,
                     "output": output,
