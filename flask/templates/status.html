@@ -91,7 +91,11 @@
                                 {% else %}
       				{{site}}: {{ entry.sites[site] }} <br />
                                 {% endif %}
-      		            {% endfor %}
+      		            {% endfor %}<br>
+      			    {% if entry.status %}
+      			    {{ entry.status}} <br />
+                            {% endif %}
+
       			</td>	
       		</tr>
       		{% endfor %}

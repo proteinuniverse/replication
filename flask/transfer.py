@@ -4,12 +4,14 @@ from flask import request
 from flask import Flask
 from flask import g
 from flask import render_template
+from flask.ext.cors import CORS, cross_origin
 import json
 import os
 import requests
 import urllib
 import ConfigParser
 import uuid
+import time
 from pymongo import MongoClient
 from bson.json_util import dumps
 
@@ -52,8 +54,6 @@ except Exception as e:
     print "Could not connect to Mongo DB: " + str(e)
     exit -1
 
-
-
 #def remote_makedir(group,dest, filepath):
 def remote_makedir(dest, filepath):
     mkdir_template = """{
@@ -86,8 +86,6 @@ def replicate(source, dest, file):
     """
 
     if test_mode==1:
-      print "Debug: "+str(source)
-      print "Debug: "+str(dest)
       return str(uuid.uuid4())
     transfer_template = """{
       "submission_id": "%s", 
@@ -173,7 +171,6 @@ def remote_del(dest, filepath):
                                    path)
     # This will clean up the JSON
     payload=json.dumps(json.loads(post_body))
-    print "Debug: %s"%(endpoint)
     r = requests.post(transfer_api_url + '/delete', data=payload, headers=g.headers)
 
     output = r.json()
@@ -183,6 +180,36 @@ def remote_del(dest, filepath):
 
     return output["task_id"]
 
+def update_all():
+    for doc in collection.find({'status':{ '$ne': 'COMPLETED'}}):
+        # Do update
+        print "Updating "+doc['file']
+        newstatus="COMPLETED"
+        for site_name in doc['sites'].keys():
+            site = doc['sites'][site_name]
+            if 'status' not in site:
+                continue
+            if 'task_id' in site and site['task_id'] and (site['status']!='SUCCEEDED') and (site['status']!='deleted'):
+                status=get_status(site['task_id'])
+                dest_key = "sites." + site_name + ".status"
+                site['status']=status
+                update_doc = {
+                    "$set": {
+                        dest_key: status
+                    }
+                }
+                collection.update({'_id':doc['_id']}, update_doc, upsert=True)
+            if (site['status'] != 'SUCCEEDED') and (site['status'].upper()!='DELETED' and (site['status'].upper()!='SOURCE')):
+                print site['status']
+                newstatus='INPROGRESS'
+        print doc['file']+' '+newstatus
+        update_doc = {
+            "$set": {
+                'status': newstatus
+            }
+        }
+        collection.update({'_id':doc['_id']}, update_doc, upsert=True)
+   
 def parse_token(token):
     items = token.split('|')
     header_info = {}
@@ -210,27 +237,36 @@ def before_request():
             response.status_code = 403
             return response
 
-@app.route('/')
+@app.route('/',methods=['GET'])
 def status_page(name=None):
     entries = json.loads(dumps(collection.find()))
     response={}
     try:
+       update_all()
        response=render_template('status.html', entries=entries)
        return response
     except Exception as e:
        return 'ERROR '+str(e)
     
-@app.route('/api/status')
+@app.route('/api/status', methods=['GET'])
 def status_json(name=None):
-    return dumps(collection.find())
+    user = g.user_info['un']
+    update_all()
+    return dumps(collection.find({'user':user}))
 
-@app.route("/api")
+@app.route('/statusall', methods=['GET'])
+@cross_origin() # allow all origins all methods.
+def status_jsonall(name=None):
+    update_all()
+    return dumps(collection.find({}))
+
+@app.route("/api", methods=['GET'])
 def base_api():
     output = json.loads(dumps(collection.find()))
     return jsonify({"status": "OK", 
                     "name": "replicant", 
                     "version": "0.0.1", 
-                    "urls": ["/transfer", "/update", "/delete", "/mkdir","/status"],
+                    "urls": ["/transfer", "/update", "/delete", "/mkdir","/status","/register"],
                     "output": output,
                     "error": ""})
 
@@ -256,7 +292,6 @@ def register():
             raise Exception("No destinations list supplied")
         destinations = str(request.form['destinations'])
         register_group(group,destinations)
-        print groups
     except Exception as e:
         message = str(e)
         output.append({"status": "ERROR", "message": message})
@@ -392,18 +427,27 @@ def update():
         if doc == None:
             raise Exception("No doc found in mongo")
 
+        newstatus='COMPLETE'
         for site_name in doc['sites'].keys():
             site = doc['sites'][site_name]
             # TODO: Check other end states in Globus
             if site['task_id'] and (site['status']!='SUCCEEDED') and (site['status']!='deleted'):
                 status=get_status(site['task_id'])
                 dest_key = "sites." + site_name + ".status"
+                if status!='SUCCESS':
+                    newstatus="INPROGRESS" 
                 update_doc = {
                     "$set": {
                         dest_key: status
                     }
                 }
                 collection.update(spec, update_doc, upsert=True)
+        update_doc = {
+            "$set": {
+                status: newstatus
+            }
+        }
+        collection.update(spec, update_doc, upsert=True)
 
     except Exception as e:
         status = "ERROR"
@@ -418,7 +462,7 @@ def update():
     return response
 
 
-@app.route("/api/transfer", methods=['GET'])
+@app.route("/api/transfer", methods=['POST'])
 def transfer():
 
     user = g.user_info['un']
@@ -459,10 +503,11 @@ def transfer():
                 "ctime": ctime,
                 "size": size,
                 "replgroup": group,
+                "status": 'INPROGRESS',
                 "sites": {
                     source: {
                         "task_id": None,
-                        "status": "source",
+                        "status": "SOURCE",
                     }
                 }
             }
@@ -520,7 +565,9 @@ def transfer():
     response.status_code = status_code
     return response
 
-
 if __name__ == "__main__":
     app.debug = True
+
+    # Launch monitor thread
+
     app.run()

@@ -29,3 +29,36 @@ curl -H "Authorization: Globus-Goauthtoken $TOKEN" -X GET http://127.0.0.1:5000/
 
 curl -H "Authorization: Globus-Goauthtoken $TOKEN" -X GET http://127.0.0.1:5000/
 ```
+
+
+## API
+
+Common Terms
+  * file refers to the relative path of the file to be replicated, deleted, etc.  It is relative to the base directory on the source end-point.
+  For example, if the base was /data and /data/file1 was being replicated, then the file would be /file1.
+
+### status
+
+/api/status (GET) - Gets the status of all files for the authenicated user.  No paramters.
+
+### register
+
+/api/register (POST) - Registers a new replication group.  Parameters: group and destinations.
+   Format for destinations:  Comma seperated list of end-points of the form <alias>|<gloubus endpoint>:<path>
+   Example destinations=pnnl|pic#dtn:test/,lbnl|nersc#dtn:/global/scratch2/sd/canon/test/
+
+### mkdir
+
+/api/mkdir (GET) - Create a new directory.  Parameter: file, source, group
+   file is the pathname
+   source is the alias name for the source location
+   group is the replication group
+
+### transfer
+/api/transfer (POST) - Replicate a file. Parameters: file, source, size, ctime, group
+
+### delete
+/api/delete (GET) - Delete a file or directory. Parameter: file
+   file is the pathname to the file to be deleted
+   The other parameters are stored in mongo.
+
