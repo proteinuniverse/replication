@@ -567,7 +567,4 @@ def transfer():
 
 if __name__ == "__main__":
     app.debug = True
-
-    # Launch monitor thread
-
     app.run()
