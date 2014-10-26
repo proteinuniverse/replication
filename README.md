@@ -9,18 +9,15 @@ Dependencies
 
 This makes use of:
 * GlobusOnline
-* Lsyncd (https://code.google.com/p/lsyncd/).  
 * MongoDB
 
 Before using, you will need to modify config.ini to specify the mongo login information
 and specify the various GO endpoints.  You will also need to make sure you have authorized
-the various end points and configured globus to use an ssh key.  Finally, you will need to
-modify lrepl.lua to specify which directory to watch and the location of the transfer scripts.
+the various end points.
 
 Usage 
 =====
 
-* Configure Globus to use an ssh key
-* Authorize any end-points that you will use (source and destination) in GlobusOnline
-* Run lsyncd ./lrepl.lua
-* Then create files in the watch directory.
+* Consult flask directory to setup the service.  You will need to authorize endpoints in Globus for replication to work.
+* Consult agent directory to setup the agent
+
