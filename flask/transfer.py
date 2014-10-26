@@ -4,7 +4,7 @@ from flask import request
 from flask import Flask
 from flask import g
 from flask import render_template
-from flask.ext.cors import CORS, cross_origin
+from flask.ext.cors import cross_origin
 import json
 import os
 import requests
@@ -15,9 +15,9 @@ import time
 from pymongo import MongoClient
 from bson.json_util import dumps
 
-app = Flask(__name__)
+app = Flask(__name__,static_url_path='/project/bigdata/demo/static')
 
-test_mode=1
+test_mode=0
 
 config = ConfigParser.ConfigParser()
 config.read('config.ini')
@@ -68,7 +68,7 @@ def remote_makedir(dest, filepath):
     # This will clean up the JSON
     payload=json.dumps(json.loads(post_body))
 
-    enc_dest = urllib.quote(endpoints[dest]['endpt'])
+    enc_dest = urllib.quote(dest['endpt'])
 
     r = requests.post(transfer_api_url + '/endpoint/%s/mkdir' % enc_dest, data=payload, headers=g.headers)
     if r.status_code<200 or r.status_code>299:
@@ -242,7 +242,7 @@ def status_page(name=None):
     entries = json.loads(dumps(collection.find()))
     response={}
     try:
-       update_all()
+       #update_all()
        response=render_template('status.html', entries=entries)
        return response
     except Exception as e:
@@ -257,7 +257,7 @@ def status_json(name=None):
 @app.route('/statusall', methods=['GET'])
 @cross_origin() # allow all origins all methods.
 def status_jsonall(name=None):
-    update_all()
+    #update_all()
     return dumps(collection.find({}))
 
 @app.route("/api", methods=['GET'])
@@ -313,6 +313,7 @@ def makedir():
     error = ""
     filepath = request.args.get('file', '')
     source = request.args.get('source', '')
+    ctime = request.args.get('ctime', '')
     group = request.args.get('group', defgroup)
     output = []
     destinations=groups[group].keys()
@@ -567,4 +568,4 @@ def transfer():
 
 if __name__ == "__main__":
     app.debug = True
-    app.run()
+    app.run(port=5001)
