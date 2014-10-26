@@ -1,0 +1,8 @@
+[repl]
+api-url=https://portal-auth.nersc.gov/sdf-repl/api/
+
+[agent]
+base=/global/scratch2/sd/canon/test
+source=lbnl
+group=default
+#destinations=pnnl|pic#dtn:test/,bnl|scanon#bnl_sdf:/pnfs/usatlas.bnl.gov/sdf/,ornl|peby#cades-dtn01.ornl.gov:/data/sdf/,anl|dolson#e2:/data/sdf/,lbnl|nersc#dtn:/global/scratch2/sd/canon/test/
