@@ -21,13 +21,13 @@ curl --user your_globus_username 'https://nexus.api.globusonline.org/goauth/toke
 
 export TOKEN=<your_access_token>
 
-curl -H "Authorization: Globus-Goauthtoken $TOKEN" -X GET http://127.0.0.1:5000/transfer?file=/path/to/file_or_dir
+curl -H "Authorization: Globus-Goauthtoken $TOKEN" -X GET http://127.0.0.1:5001/api/transfer?file=/path/to/file_or_dir
 
-curl -H "Authorization: Globus-Goauthtoken $TOKEN" -X GET http://127.0.0.1:5000/update?file=/path/to/file_or_dir
+curl -H "Authorization: Globus-Goauthtoken $TOKEN" -X GET http://127.0.0.1:5001/api/update?file=/path/to/file_or_dir
 
-curl -H "Authorization: Globus-Goauthtoken $TOKEN" -X GET http://127.0.0.1:5000/delete?file=/path/to/file_or_dir
+curl -H "Authorization: Globus-Goauthtoken $TOKEN" -X GET http://127.0.0.1:5001/api/delete?file=/path/to/file_or_dir
 
-curl -H "Authorization: Globus-Goauthtoken $TOKEN" -X GET http://127.0.0.1:5000/
+curl -H "Authorization: Globus-Goauthtoken $TOKEN" -X GET http://127.0.0.1:5001/
 ```
 
 
