@@ -17,9 +17,8 @@ from bson.json_util import dumps
 
 app = Flask(__name__,static_url_path='/project/bigdata/demo/static')
 
-test_mode=0
 
-config = ConfigParser.ConfigParser()
+config = ConfigParser.ConfigParser(allow_no_value=True)
 config.read('config.ini')
 
 groups={}
@@ -35,10 +34,17 @@ def register_group(group,list):
         groups[group][dest]['endpt']=ept
         groups[group][dest]['base']=base
 
+# Popluate some parameters
+#
 transfer_api_url = config.get("globus", "api_url")
-
+port = config.get("server", "port")
 register_group(defgroup,config.get("globus", "destinations"))
+test_mode=0
+if config.has_option("server","test_mode"): 
+     test_mode = int(config.get("server", "test_mode"))
+     print "Setting Test Mode to %d"%(test_mode)
 
+# Connect to mongo
 try:
     mongo_host = config.get("mongo", "mongo_host")
     mongo_user = config.get("mongo", "mongo_user")
@@ -53,6 +59,9 @@ try:
 except Exception as e:
     print "Could not connect to Mongo DB: " + str(e)
     exit -1
+
+def get_user(g):
+     return g.user_info['un']
 
 #def remote_makedir(group,dest, filepath):
 def remote_makedir(dest, filepath):
@@ -250,7 +259,7 @@ def status_page(name=None):
     
 @app.route('/api/status', methods=['GET'])
 def status_json(name=None):
-    user = g.user_info['un']
+    user = get_user(g)
     update_all()
     return dumps(collection.find({'user':user}))
 
@@ -278,8 +287,9 @@ def register():
     group = request.args.get('group', '')
     output = []
     destinations = ""
-    user = str(g.user_info['un'])
+    user = get_user(g)
 
+# TODO: Only return the user's groups
     if request.method=='GET':
          return jsonify(groups)
        
@@ -308,6 +318,7 @@ def register():
 
 @app.route("/api/mkdir", methods=['GET'])
 def makedir():
+    user = get_user(g)
     status = "OK"
     status_code = 200
     error = ""
@@ -316,6 +327,9 @@ def makedir():
     ctime = request.args.get('ctime', '')
     group = request.args.get('group', defgroup)
     output = []
+
+    if (group != defgroup):
+        group="%s:%s"%(user,str(group))
     destinations=groups[group].keys()
 
     for dest in destinations:
@@ -341,7 +355,7 @@ def makedir():
 @app.route("/api/delete", methods=['GET'])
 def delete():
     # import pdb; pdb.set_trace()
-    user = g.user_info['un']
+    user = get_user(g)
     status = "OK"
     status_code = 200
     error = ""
@@ -411,7 +425,7 @@ def get_status(task_id):
 @app.route("/api/update", methods=['GET'])
 def update():
 
-    user = g.user_info['un']
+    user = get_user(g)
 
     status = "OK"
     status_code = 200
@@ -466,7 +480,7 @@ def update():
 @app.route("/api/transfer", methods=['POST'])
 def transfer():
 
-    user = g.user_info['un']
+    user = get_user(g)
 
     filepath = request.args.get('file', '')
     ctime = request.args.get('ctime', '')
@@ -481,6 +495,9 @@ def transfer():
     transfer_ids=[]
 
     try:
+        if (group != defgroup):
+            group="%s:%s"%(user,str(group))
+
         if group not in groups:
             raise Exception("Group not recognized")
         destinations=groups[group].keys()
@@ -568,4 +585,4 @@ def transfer():
 
 if __name__ == "__main__":
     app.debug = True
-    app.run(port=5001)
+    app.run(port=int(port))
