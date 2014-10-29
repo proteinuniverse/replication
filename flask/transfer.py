@@ -4,10 +4,12 @@ from flask import request
 from flask import Flask
 from flask import g
 from flask import render_template
+from flask import make_response
 from flask.ext.cors import cross_origin
 import json
 import os
 import requests
+from requests.auth import HTTPBasicAuth
 import urllib
 import ConfigParser
 import uuid
@@ -227,6 +229,13 @@ def parse_token(token):
         header_info[key] = val
     return header_info 
 
+def authenticate(username, password):
+    globus_auth_url = 'https://nexus.api.globusonline.org/goauth/token?grant_type=client_credentials'
+    r = requests.get(globus_auth_url, auth=HTTPBasicAuth(username, password))
+    if r.status_code >= 200 and r.status_code <=299:
+        return r.json()['access_token']
+    else:
+        return None
 
 @app.before_request
 def before_request():
@@ -256,6 +265,27 @@ def status_page(name=None):
        return response
     except Exception as e:
        return 'ERROR '+str(e)
+
+@app.route('/login',methods=['GET', 'POST'])
+def login():
+    error = None
+    headers = None
+    if request.method == 'POST':
+        token = authenticate(request.form['username'],
+                             request.form['password'])
+        if token:    
+            error = "Login Successful"
+            response = make_response(render_template('login.html', error=error))
+            response.headers['Authorization'] = 'Globus-Goauthtoken %s' % token
+            return response
+        else:
+            error = 'Invalid username/password'
+    # the code below is executed if the request method
+    # was GET or the credentials were invalid
+    return render_template('login.html', error=error)
+
+
+
     
 @app.route('/api/status', methods=['GET'])
 def status_json(name=None):
