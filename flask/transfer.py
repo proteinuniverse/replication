@@ -5,6 +5,8 @@ from flask import Flask
 from flask import g
 from flask import render_template
 from flask import make_response
+from flask import redirect
+from flask import url_for
 from flask.ext.cors import cross_origin
 import json
 import os
@@ -62,8 +64,12 @@ except Exception as e:
     print "Could not connect to Mongo DB: " + str(e)
     exit -1
 
-def get_user(g):
-     return g.user_info['un']
+def get_user():
+    user_info = getattr(g, 'user_info', None)
+    if user_info:
+        return user_info['un']
+    else:
+        return None
 
 #def remote_makedir(group,dest, filepath):
 def remote_makedir(dest, filepath):
@@ -240,20 +246,21 @@ def authenticate(username, password):
 @app.before_request
 def before_request():
     # Do common stuff before each request. In this case we can check for headers
-    if request.path.startswith("/api"):
+    g.authenticated = False
+    auth_header = request.headers.get("Authorization") or request.cookies.get("Authorization")
+    if auth_header and auth_header.startswith("Globus-Goauthtoken"):
+        g.headers = {"Authorization": "%s" % auth_header, "Content-Type": "application/json"}
+        # We can also verify the header if needed
+        g.token = auth_header.split()[1]
+        g.user_info = parse_token(g.token)
+        g.authenticated = True
 
-        if request.headers.has_key('Authorization') and request.headers['Authorization'].startswith("Globus-Goauthtoken"):
-            g.headers = {"Authorization": "%s" % request.headers['Authorization'], "Content-Type": "application/json"}
-            # We can also verify the header if needed
-            g.token = request.headers['Authorization'].split()[1]
-            g.user_info = parse_token(g.token)
-
-        else:
-            response = jsonify({"status": "ERROR", 
-                            "output": "",
-                            "error": "Missing Authorization headers"})
-            response.status_code = 403
-            return response
+    if request.path.startswith("/api") and not g.authenticated:
+        response = jsonify({"status": "ERROR", 
+                        "output": "",
+                        "error": "Missing Authorization headers"})
+        response.status_code = 403
+        return response
 
 @app.route('/',methods=['GET'])
 def status_page(name=None):
@@ -261,7 +268,7 @@ def status_page(name=None):
     response={}
     try:
        #update_all()
-       response=render_template('status.html', entries=entries)
+       response=render_template('status.html', entries=entries, username=get_user())
        return response
     except Exception as e:
        return 'ERROR '+str(e)
@@ -274,9 +281,8 @@ def login():
         token = authenticate(request.form['username'],
                              request.form['password'])
         if token:    
-            error = "Login Successful"
-            response = make_response(render_template('login.html', error=error))
-            response.headers['Authorization'] = 'Globus-Goauthtoken %s' % token
+            response = redirect(url_for('status_page'))
+            response.set_cookie('Authorization', 'Globus-Goauthtoken %s' % token)
             return response
         else:
             error = 'Invalid username/password'
@@ -284,12 +290,16 @@ def login():
     # was GET or the credentials were invalid
     return render_template('login.html', error=error)
 
-
+@app.route('/logout')
+def logout():
+    response = redirect(url_for('status_page'))
+    response.set_cookie('Authorization', expires=0)
+    return response
 
     
 @app.route('/api/status', methods=['GET'])
 def status_json(name=None):
-    user = get_user(g)
+    user = get_user()
     update_all()
     return dumps(collection.find({'user':user}))
 
@@ -317,7 +327,7 @@ def register():
     group = request.args.get('group', '')
     output = []
     destinations = ""
-    user = get_user(g)
+    user = get_user()
 
 # TODO: Only return the user's groups
     if request.method=='GET':
@@ -348,7 +358,7 @@ def register():
 
 @app.route("/api/mkdir", methods=['GET'])
 def makedir():
-    user = get_user(g)
+    user = get_user()
     status = "OK"
     status_code = 200
     error = ""
@@ -385,7 +395,7 @@ def makedir():
 @app.route("/api/delete", methods=['GET'])
 def delete():
     # import pdb; pdb.set_trace()
-    user = get_user(g)
+    user = get_user()
     status = "OK"
     status_code = 200
     error = ""
@@ -455,7 +465,7 @@ def get_status(task_id):
 @app.route("/api/update", methods=['GET'])
 def update():
 
-    user = get_user(g)
+    user = get_user()
 
     status = "OK"
     status_code = 200
@@ -510,7 +520,7 @@ def update():
 @app.route("/api/transfer", methods=['POST'])
 def transfer():
 
-    user = get_user(g)
+    user = get_user()
 
     filepath = request.args.get('file', '')
     ctime = request.args.get('ctime', '')
