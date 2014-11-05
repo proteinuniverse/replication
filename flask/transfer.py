@@ -269,6 +269,17 @@ def status_jsonall(name=None):
     #update_all()
     return dumps(collection.find({}))
 
+@app.route("/register", methods=['GET'])
+def registerall():
+    status = "OK"
+    status_code = 200
+    error = ""
+    output = []
+
+    return jsonify(groups)
+       
+
+
 @app.route("/api", methods=['GET'])
 def base_api():
     output = json.loads(dumps(collection.find()))
