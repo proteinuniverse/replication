@@ -9,6 +9,7 @@ import time
 import sys
 from bson.json_util import dumps
 import pyinotify
+from multiprocessing import Process
 
 config = ConfigParser.ConfigParser()
 config.read('config.ini')
@@ -70,6 +71,11 @@ class EventHandler(pyinotify.ProcessEvent):
         print "Removing:", file
         delete(file)
 
+def update():
+    while True:
+       status()
+       time.sleep(60)
+
 
 if __name__ == "__main__":
 #    args=sys.argv[1:]
@@ -81,8 +87,9 @@ if __name__ == "__main__":
 #        status()
     tok=open(os.getenv("HOME")+"/.repl_token")
     token=tok.read()
-    print token
     header['Authorization']='Globus-Goauthtoken '+token
+    p = Process(target=update)
+    p.start()
     handler = EventHandler()
     notifier = pyinotify.Notifier(wm, handler)
 

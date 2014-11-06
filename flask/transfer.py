@@ -206,7 +206,7 @@ def update_all():
             site = doc['sites'][site_name]
             if 'status' not in site:
                 continue
-            if 'task_id' in site and site['task_id'] and (site['status']!='SUCCEEDED') and (site['status']!='deleted'):
+            if 'task_id' in site and site['task_id'] and (site['status']!='SUCCEEDED') and (site['status']!='DELETED'):
                 status=get_status(site['task_id'])
                 dest_key = "sites." + site_name + ".status"
                 site['status']=status
@@ -441,11 +441,15 @@ def delete():
                 "$set": {
                     dest_key:  {
                         "task_id": t_id,
-                        "status": "deleting",
+                        "status": "DELETING",
                     }
                 }
             }
             collection.update(spec, doc, upsert=True)
+        doc = {
+            "$set": { "status": "DELETING" }
+        }
+        collection.update(spec, doc, upsert=True)
 
     except Exception as e:
         status = "ERROR"
@@ -497,7 +501,7 @@ def update():
         for site_name in doc['sites'].keys():
             site = doc['sites'][site_name]
             # TODO: Check other end states in Globus
-            if site['task_id'] and (site['status']!='SUCCEEDED') and (site['status']!='deleted'):
+            if site['task_id'] and (site['status']!='SUCCEEDED') and (site['status']!='DELETED'):
                 status=get_status(site['task_id'])
                 dest_key = "sites." + site_name + ".status"
                 if status!='SUCCESS':
@@ -597,7 +601,7 @@ def transfer():
                     "$set": {
                         dest_key:  {
                             "task_id": t_id,
-                            "status": "started",
+                            "status": "STARTED",
                         }
                     }
                 }
